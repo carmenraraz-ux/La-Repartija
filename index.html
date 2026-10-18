@@ -27,7 +27,7 @@ label{display:block;margin:10px 0 4px;font-size:13px;color:var(--mut)}.step{bord
 <body>
 <main>
 <header><h1>💰 Finanzas Familiares <span class="mut" id="mes"></span></h1>
-<div><button class="s" onclick="cfg()">⚙️</button> <button class="s" onclick="load()">↻</button></div></header>
+<div><button class="s" onclick="load()">↻</button></div></header>
 <div id="v"></div>
 </main>
 <nav id="nav"></nav>
@@ -36,16 +36,15 @@ label{display:block;margin:10px 0 4px;font-size:13px;color:var(--mut)}.step{bord
 const $=s=>document.querySelector(s), S2=n=>'S/ '+Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
 const TABS=[['ing','📥','Ingresos'],['gas','🛒','Gastos'],['way','🏦','Wayki'],['deu','🧾','Deudas'],['mov','🔄','Mover']];
 let S=null, tab='ing', ult=null;
-const get=k=>localStorage.getItem(k)||'';
+const API_URL='https://script.google.com/macros/s/AKfycbxhtQUnHSPa1uNXgDdjE4VI9Igw2iSBecKujoaLQyrOziQ9yDJoYtBhkdd-UtQwGzULIw/exec';
+const API_KEY='papirene2026';
 async function api(action,data={}){
-  if(!get('url')||!get('key')){cfg();throw new Error('Configura la URL y la clave');}
-  const r=await fetch(get('url'),{method:'POST',body:JSON.stringify({token:get('key'),action,...data})});
+  const r=await fetch(API_URL,{method:'POST',body:JSON.stringify({token:API_KEY,action,...data})});
   const j=await r.json(); if(!j.ok) throw new Error(j.error); return j.data;
 }
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',3500)}
 async function load(){try{S=await api('estado');render()}catch(e){toast(e.message)}}
 async function run(action,data,ok){try{const r=await api(action,data);$('#dlg').close();toast(ok||'Listo ✔');await load();return r}catch(e){toast(e.message)}}
-function cfg(){dlg(`<h3>Conexión</h3><label>URL de la Web App (Apps Script)</label><input id="u" value="${get('url')}"><label>Clave (API_KEY)</label><input id="k" type="password" value="${get('key')}"><p><button class="p" onclick="localStorage.url=u.value.trim();localStorage.key=k.value.trim();$('#dlg').close();load()">Guardar</button></p>`)}
 function dlg(h){const d=$('#dlg');d.innerHTML=h;d.showModal()}
 const hoy=()=>new Date().toISOString().slice(0,10);
 const opts=l=>l.map(b=>`<option value="${b.id_bolsa}">${b.nombre_bolsa} · ${S2(b.saldo)}</option>`).join('');
