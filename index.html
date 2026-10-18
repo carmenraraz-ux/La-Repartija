@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Finanzas Familiares</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--tx:#17212b;--mut:#6b7785;--bd:#e2e7ee;--pri:#1f5fbf;--ok:#2e9d5b;--am:#e0a21b;--rj:#d64545;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#0f141a;--card:#18202a;--tx:#e8edf3;--mut:#8f9bab;--bd:#273241;--pri:#5b9bff;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:env(safe-area-inset-top) 0 calc(70px + env(safe-area-inset-bottom))}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px}
+h1{font-size:18px;margin:0}h2{font-size:15px;margin:18px 16px 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+main{max-width:760px;margin:auto}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:0 16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}.mut{color:var(--mut);font-size:13px}.big{font-size:22px;font-weight:650}
+.bar{height:8px;background:var(--bd);border-radius:5px;overflow:hidden;margin:8px 0 4px}.bar i{display:block;height:100%;border-radius:5px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+button,select,input{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:9px;padding:9px 12px;width:100%}
+button{cursor:pointer;width:auto}button.p{background:var(--pri);color:#fff;border:0}button.s{padding:5px 10px;font-size:13px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;border-radius:0;background:none;font-size:12px;padding:10px 2px;color:var(--mut)}nav button.on{color:var(--pri);font-weight:700}
+dialog{border:1px solid var(--bd);border-radius:14px;background:var(--card);color:var(--tx);width:min(420px,92vw);padding:16px}dialog::backdrop{background:#0008}
+label{display:block;margin:10px 0 4px;font-size:13px;color:var(--mut)}.step{border-left:4px solid var(--pri);padding:6px 12px;margin:8px 16px;background:var(--card);border-radius:0 10px 10px 0}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;background:#222;color:#fff;padding:10px 16px;border-radius:20px;display:none;z-index:9;max-width:90vw}
+</style>
+</head>
+<body>
+<main>
+<header><h1>💰 Finanzas Familiares <span class="mut" id="mes"></span></h1>
+<div><button class="s" onclick="cfg()">⚙️</button> <button class="s" onclick="load()">↻</button></div></header>
+<div id="v"></div>
+</main>
+<nav id="nav"></nav>
+<dialog id="dlg"></dialog><div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s), S2=n=>'S/ '+Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const TABS=[['ing','📥','Ingresos'],['gas','🛒','Gastos'],['way','🏦','Wayki'],['deu','🧾','Deudas'],['mov','🔄','Mover']];
+let S=null, tab='ing', ult=null;
+const get=k=>localStorage.getItem(k)||'';
+async function api(action,data={}){
+  if(!get('url')||!get('key')){cfg();throw new Error('Configura la URL y la clave');}
+  const r=await fetch(get('url'),{method:'POST',body:JSON.stringify({token:get('key'),action,...data})});
+  const j=await r.json(); if(!j.ok) throw new Error(j.error); return j.data;
+}
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',3500)}
+async function load(){try{S=await api('estado');render()}catch(e){toast(e.message)}}
+async function run(action,data,ok){try{const r=await api(action,data);$('#dlg').close();toast(ok||'Listo ✔');await load();return r}catch(e){toast(e.message)}}
+function cfg(){dlg(`<h3>Conexión</h3><label>URL de la Web App (Apps Script)</label><input id="u" value="${get('url')}"><label>Clave (API_KEY)</label><input id="k" type="password" value="${get('key')}"><p><button class="p" onclick="localStorage.url=u.value.trim();localStorage.key=k.value.trim();$('#dlg').close();load()">Guardar</button></p>`)}
+function dlg(h){const d=$('#dlg');d.innerHTML=h;d.showModal()}
+const hoy=()=>new Date().toISOString().slice(0,10);
+const opts=l=>l.map(b=>`<option value="${b.id_bolsa}">${b.nombre_bolsa} · ${S2(b.saldo)}</option>`).join('');
+const sem=b=>{const p=b.asignado>0?b.gastado/b.asignado:0;return{p,c:p>=S.params.umbral_rojo?'var(--rj)':p>=S.params.umbral_ambar?'var(--am)':'var(--ok)'}};
+function bolsaCard(b,btn){const s=sem(b);return`<div class="card"><div class="row"><b>${b.nombre_bolsa}</b>${btn?`<button class="s p" onclick="gastoDlg('${b.id_bolsa}')">+ Gasto</button>`:''}</div>
+<div class="big">${S2(b.saldo)}</div><div class="bar"><i style="width:${Math.min(100,s.p*100)}%;background:${s.c}"></i></div>
+<div class="mut"><span class="dot" style="background:${s.c}"></span>Gastado ${S2(b.gastado)} de ${S2(b.asignado)} (${Math.round(s.p*100)}%)</div></div>`}
+const por=g=>S.bolsas.filter(b=>g.includes(b.grupo));
+function render(){
+  $('#mes').textContent=String(S.mes).replace(/(\d{4})(\d\d)/,'$1-$2');
+  $('#nav').innerHTML=TABS.map(t=>`<button class="${t[0]==tab?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}<br>${t[2]}</button>`).join('');
+  const bcp=S.bolsas.filter(b=>b.cuenta=='BCP').reduce((s,b)=>s+b.saldo,0),wk=S.bolsas.filter(b=>b.cuenta=='WAYKI').reduce((s,b)=>s+b.saldo,0);
+  const top=`<div class="grid"><div class="card"><div class="mut">BCP</div><div class="big">${S2(bcp)}</div></div><div class="card"><div class="mut">WAYKI</div><div class="big">${S2(wk)}</div></div></div>`;
+  $('#v').innerHTML=top+({ing,gas,way,deu,mov})[tab]();
+}
+/* ---- Módulo 1 */
+function ing(){
+  const hechos=S.ingresosMes.map(i=>i.id_fuente);
+  let h='<h2>Registrar ingreso</h2><div class="grid">'+S.ingresos.map(f=>`<div class="card"><b>${f.fuente_ingreso}</b><div class="mut">${f.banco_recepcion} · ${f.frecuencia}</div><div class="big">${S2(f.monto_base)}</div>
+  <p><button class="p" onclick="ingDlg(${f.id_fuente})">Registrar</button> ${hechos.includes(f.id_fuente)?'<span class="mut">✔ ya este mes</span>':''}</p></div>`).join('')+'</div>';
+  if(ult) h+='<h2>Órdenes de transferencia</h2>'+ult.map(p=>`<div class="step"><b>Paso ${p.n}: ${S2(p.monto)}</b><br>${p.texto}${p.detalle?'<div class="mut">'+Object.entries(p.detalle).map(([k,v])=>k+' '+S2(v)).join(' · ')+'</div>':''}</div>`).join('');
+  return h;
+}
+function ingDlg(id){const f=S.ingresos.find(x=>x.id_fuente==id);dlg(`<h3>${f.fuente_ingreso}</h3><label>Monto recibido</label><input id="m" type="number" step="0.01" value="${f.monto_base}"><label>Fecha</label><input id="f" type="date" value="${hoy()}">
+<p><button class="p" onclick="regIng(${id})">Registrar y distribuir</button></p>`)}
+async function regIng(id){const r=await run('ingreso',{id_fuente:id,monto:+m.value,fecha:f.value},'Ingreso distribuido ✔');if(r){ult=r.pasos;render()}}
+/* ---- Módulo 2 */
+function gas(){return'<h2>Gastos operativos (BCP)</h2><div class="grid">'+por(['CASA_OPERATIVO','PASAJES']).map(b=>bolsaCard(b,1)).join('')+'</div>'}
+function gastoDlg(id){dlg(`<h3>+ Registrar gasto</h3><label>Rubro</label><select id="b">${opts(S.bolsas.filter(x=>x.cuenta=='BCP'))}</select><label>Monto</label><input id="m" type="number" step="0.01"><label>Concepto</label><input id="c"><label>Fecha</label><input id="f" type="date" value="${hoy()}">
+<p><button class="p" onclick="run('gasto',{bolsa:b.value,monto:+m.value,concepto:c.value,fecha:f.value},'Gasto registrado')">Guardar</button></p>`);if(id)$('#b').value=id}
+/* ---- Módulo 3 */
+function way(){
+  const gasB=S.bolsas.find(b=>/^Gas/.test(b.nombre_bolsa)),meta=gasB.meta_acumulable||0;
+  return'<h2>Largo plazo + Nana</h2><div class="grid">'+por(['NANA','LARGO_PLAZO']).map(b=>`<div class="card"><b>${b.nombre_bolsa}</b><div class="big">${S2(b.saldo)}</div><div class="mut">Aporte mensual ${S2(b.presupuesto_mensual)}</div></div>`).join('')+
+  '</div><h2>Servicios en reserva (rinden intereses)</h2><div class="grid">'+por(['CASA_SERVICIOS']).map(b=>bolsaCard(b)).join('')+'</div>'+
+  `<div class="step"><b>Gas:</b> ${S2(gasB.saldo)} de ${S2(meta)} ${gasB.saldo>=meta?'✔ Reserva de gas completa':''}</div>`;
+}
+/* ---- Módulo 4 */
+function deu(){return'<h2>Deudas</h2><div class="grid">'+S.deudas.map(d=>{const pg=100-d.saldo_pendiente/d.monto_inicial*100;return`<div class="card"><b>${d.nombre_prestamo}</b> <span class="mut">(${d.acreedor}) · ${d.estado}</span>
+<div class="big">${S2(d.saldo_pendiente)}</div><div class="bar"><i style="width:${pg}%;background:var(--ok)"></i></div><div class="mut">Pagado ${Math.round(pg)}% de ${S2(d.monto_inicial)}</div>
+${d.estado=='ACTIVA'?`<p><button class="p" onclick="abonoDlg('${d.id_deuda}')">+ Abonar a deuda</button></p>`:''}</div>`}).join('')+'</div>'}
+function abonoDlg(id){const d=S.deudas.find(x=>x.id_deuda==id),L=['Negocio','Ahorro','Deuda'].map(n=>S.bolsas.find(b=>b.nombre_bolsa==n));
+dlg(`<h3>Abono combinado — ${d.nombre_prestamo}</h3><div class="mut">Pendiente ${S2(d.saldo_pendiente)}</div>`+L.map(b=>`<label>${b.nombre_bolsa} (disp. ${S2(b.saldo)})</label><input class="ab" data-b="${b.id_bolsa}" type="number" step="0.01" min="0" oninput="tot.textContent=S2([...document.querySelectorAll('.ab')].reduce((s,i)=>s+(+i.value||0),0))">`).join('')+
+`<p>Total: <b id="tot">S/ 0.00</b></p><label>Nota</label><input id="n"><p><button class="p" onclick="run('abono',{id_deuda:'${id}',nota:n.value,fecha:hoy(),partes:[...document.querySelectorAll('.ab')].map(i=>({bolsa:i.dataset.b,monto:+i.value||0}))},'Abono aplicado ✔')">Confirmar abono</button></p>`)}
+/* ---- Módulo 5 */
+function mov(){
+  const t=S.movimientos.filter(m=>['TRASLADO','ABONO_DEUDA'].includes(m.tipo)).slice(0,12),nm=id=>(S.bolsas.find(b=>b.id_bolsa==id)||{nombre_bolsa:id}).nombre_bolsa;
+  return`<h2>🔄 Mover dinero</h2><div class="card" style="margin:0 16px"><label>De</label><select id="o">${opts(S.bolsas)}</select><label>A</label><select id="d">${opts(S.bolsas)}</select><label>Monto</label><input id="m" type="number" step="0.01"><label>Motivo</label><input id="r">
+<p><button class="p" onclick="run('traslado',{origen:o.value,destino:d.value,monto:+m.value,motivo:r.value,fecha:hoy()},'Dinero movido ✔')">Mover</button></p></div>
+<h2>Últimos traslados y abonos</h2>`+t.map(x=>`<div class="step"><b>${S2(x.monto)}</b> ${nm(x.bolsa_origen)} → ${nm(x.bolsa_destino)}<div class="mut">${x.fecha} · ${x.concepto}</div></div>`).join('')+
+`<h2>Reporte</h2><div style="padding:0 16px"><a href="${S.sheetUrl}" target="_blank"><button>📊 Abrir Excel (Google Sheets)</button></a> <a href="${S.sheetUrl.replace(/\/edit.*/,'')}/export?format=xlsx" target="_blank"><button>⬇ Descargar .xlsx</button></a></div>`;
+}
+load();
+</script>
+</body>
+</html>
