@@ -400,7 +400,8 @@ const ICONS = {
  coins:'<circle cx="12" cy="12" r="9"/><path d="M14.8 9.2A3.5 3.5 0 0 0 12 8c-1.7 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2a3.6 3.6 0 0 1-3-1.4M12 6.5V8M12 16v1.5"/>',
  palette:'<circle cx="13.5" cy="6.5" r=".8"/><circle cx="17.5" cy="10.5" r=".8"/><circle cx="8.5" cy="7.5" r=".8"/><circle cx="6.5" cy="12.5" r=".8"/><path d="M12 2a10 10 0 1 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.3-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4a4.6 4.6 0 0 0 4.6-4.6C22 6 17.5 2 12 2z"/>',
  wallet:'<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1"/>',
- scale:'<path d="M12 3v18M5 21h14"/><path d="M5 7l-3 7a3.5 3.5 0 0 0 6 0L5 7zM19 7l-3 7a3.5 3.5 0 0 0 6 0l-3-7z"/><path d="M5 7h14"/>'
+ scale:'<path d="M12 3v18M5 21h14"/><path d="M5 7l-3 7a3.5 3.5 0 0 0 6 0L5 7zM19 7l-3 7a3.5 3.5 0 0 0 6 0l-3-7z"/><path d="M5 7h14"/>',
+ edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>'
 };
 const ic = (n, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
 function hidratar(root) { (root || document).querySelectorAll('[data-ic]').forEach(e => { if (!e.dataset.done) { e.innerHTML = ic(e.dataset.ic, Number(e.dataset.s) || 20); e.dataset.done = 1; e.style.display = e.style.display || 'inline-flex'; } }); }
@@ -589,8 +590,11 @@ function renderInicio() {
   });
   d.deudas.forEach(dd => {
     const pag = r2(dd.monto_inicial - dd.saldo_pendiente), pct = dd.monto_inicial > 0 ? Math.min(100, Math.max(0, pag / dd.monto_inicial * 100)) : 100;
-    h += `<div class="card hov"><div class="gh" style="cursor:default"><div class="chipi sm">${ic('clock', 20)}</div><div class="t"><div class="lbl">${esc(dd.nombre_prestamo)} · ${esc(dd.acreedor)}</div><div class="val" style="font-size:22px;margin-top:2px">${fmt(dd.saldo_pendiente)} <span class="hint" style="font-weight:500;font-size:13px">${dd.estado === 'ACTIVA' ? 'por pagar' : 'pagada'}</span></div></div></div>
-      <div class="bar"><i style="width:${pct}%"></i></div><div class="hint">Pagado: <b>${fmt(pag)}</b> de ${fmt(dd.monto_inicial)} · Fondo Deuda: <b>${fmt((bol('B06') || {}).saldo)}</b></div></div>`;
+    const fu = ['B02', 'B03', 'B06'].map(bol).filter(Boolean), disp = r2(fu.reduce((a, b) => a + b.saldo, 0)), k = 'deu' + dd.id_deuda;
+    h += `<div class="card hov ${S.open[k] ? 'open' : ''}" data-g="${k}"><div class="gh"><div class="chipi sm">${ic('clock', 20)}</div><div class="t"><div class="lbl">${esc(dd.nombre_prestamo)} · ${esc(dd.acreedor)}</div><div class="val" style="font-size:22px;margin-top:2px">${fmt(dd.saldo_pendiente)} <span class="hint" style="font-weight:500;font-size:13px">${dd.estado === 'ACTIVA' ? 'por pagar' : 'pagada'}</span></div></div><span class="chev">${ic('chev', 20)}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div><div class="hint">Pagado: <b>${fmt(pag)}</b> de ${fmt(dd.monto_inicial)} · Falta: <b>${fmt(dd.saldo_pendiente)}</b></div>
+      <div class="hint" style="margin-top:6px">Toca para ver de qué bolsas de Wayki puedes abonar</div>
+      <div class="collapse"><div><div class="det">${fu.map(b => `<div class="r"><span>${esc(b.nombre_bolsa)}</span><b class="${sgn(b.saldo)}">${fmt(b.saldo)}</b></div>`).join('')}<div class="r"><b>Disponible para abonar</b><b class="pos">${fmt(disp)}</b></div></div></div></div></div>`;
   });
   h += `<div class="sech"><span>Últimos movimientos</span><button class="lnk" style="color:var(--accent);text-decoration:none" data-v="movs">Ver todos</button></div>${listaMovs(d.historial.slice(0, 5))}`;
   $('vInicio').innerHTML = h;
@@ -633,14 +637,14 @@ function renderCuentas() {
 }
 
 /* ---- movimientos */
-function listaMovs(arr) {
+function listaMovs(arr, acc) {
   if (!arr.length) return '<p class="hint" style="text-align:center;padding:26px 0">Aún no hay movimientos.</p>';
   return '<div class="stack">' + arr.map(m => {
     const ing = m.tipo === 'Ingreso' || m.tipo === 'Saldo inicial', tr = m.tipo === 'Traslado', deu = m.tipo === 'Pago deuda';
     const icn = ing ? 'down' : tr ? 'repeat' : deu ? 'clock' : 'up', cl = ing ? 'pos' : tr ? '' : 'neg';
     const det = tr ? `${esc(m.origen)} → ${esc(m.destino)}` : deu ? `${esc(m.origen)} → Deuda` : ing ? 'Repartido en bolsas' : esc(m.origen);
     const extra = [m.metodo, m.quien].filter(Boolean).map(esc).join(' · ');
-    return `<div class="row"><div class="chipi sm ${cl}">${ic(icn, 20)}</div><div class="m"><b>${esc(m.desc || m.tipo)}</b><small>${fCorta(m.fecha)} · ${det}${extra ? ' · ' + extra : ''}</small></div><div class="a ${cl}">${ing ? '+' : tr ? '' : '−'}${fmt(m.monto)}</div></div>`;
+    return `<div class="row"><div class="chipi sm ${cl}">${ic(icn, 20)}</div><div class="m"><b>${esc(m.desc || m.tipo)}</b><small>${fCorta(m.fecha)} · ${det}${extra ? ' · ' + extra : ''}</small></div><div class="a ${cl}">${ing ? '+' : tr ? '' : '−'}${fmt(m.monto)}</div>${acc ? `${m.tipo === 'Saldo inicial' ? '' : `<button class="x" data-ed="${esc(m.id)}" aria-label="Editar">${ic('edit', 18)}</button>`}<button class="x" data-del="${esc(m.id)}" aria-label="Anular">${ic('trash', 18)}</button>` : ''}</div>`;
   }).join('') + '</div>';
 }
 const TF = { Todos: null, Gastos: 'Gasto', Ingresos: 'Ingreso', Traslados: 'Traslado', Deudas: 'Pago deuda' };
@@ -649,9 +653,49 @@ function renderMovs() {
   const arr = d.historial.filter(m => (!TF[S.ft] || m.tipo === TF[S.ft]) && (S.fq === 'Todos' || m.quien === S.fq) && (S.fm === 'Todos' || m.metodo === S.fm));
   const gas = r2(arr.filter(m => m.tipo === 'Gasto').reduce((a, m) => a + m.monto, 0));
   $('vMovs').innerHTML = chip('ft', Object.keys(TF), S.ft) + chip('fq', ['Todos', ...USUARIOS.map(u => u.nombre)], S.fq) + chip('fm', ['Todos', ...METODOS], S.fm) +
-    `<div class="sech"><span>${arr.length} movimiento${arr.length === 1 ? '' : 's'}</span><span class="neg">${gas > 0 ? 'Gastos −' + fmt(gas) : ''}</span></div>` + listaMovs(arr);
+    `<div class="sech"><span>${arr.length} movimiento${arr.length === 1 ? '' : 's'}</span><span class="neg">${gas > 0 ? 'Gastos −' + fmt(gas) : ''}</span></div>` + listaMovs(arr, true);
 }
-$('vMovs').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (!b) return; S[b.dataset.k] = b.dataset.x; renderMovs(); });
+$('vMovs').addEventListener('click', async e => {
+  const k = e.target.closest('[data-k]'); if (k) { S[k.dataset.k] = k.dataset.x; renderMovs(); hidratar(); return; }
+  const dl = e.target.closest('[data-del]'), ed = e.target.closest('[data-ed]'), id = (dl || ed || {}).dataset && (dl ? dl.dataset.del : ed.dataset.ed); if (!id) return;
+  const m = S.data.historial.find(x => x.id === id); if (!m) return;
+  if (ed) { editarDlg(m); return; }
+  const extra = m.tipo === 'Ingreso' ? ' Se quitará de todas las bolsas.' : m.tipo === 'Pago deuda' ? ' La deuda volverá a subir y el dinero regresa a las bolsas.' : ' El dinero vuelve a la bolsa.';
+  if (!await confirmar('¿Anular este movimiento?', `${m.desc || m.tipo} · ${fmt(m.monto)} (${fCorta(m.fecha)}).${extra} No se puede deshacer.`, 'Anular')) return;
+  try { const j = await call('anular', { id }); S.seq++; setData(j.resumen); toast('Movimiento anulado', 'success'); }
+  catch (er) { toast(er.message, 'error'); }
+});
+function editarDlg(m) {
+  const box = document.querySelector('#modal .box'), orig = box.innerHTML, d = S.data, T = m.tipo;
+  const f = (l, inner) => `<div class="fld" style="margin-top:12px"><label>${l}</label>${inner}</div>`;
+  const quien = USUARIOS.map(u => `<option>${u.nombre}</option>`).join(''), metodo = '<option value="">—</option>' + METODOS.map(x => `<option>${x}</option>`).join('');
+  let h = `<h3>Editar ${esc(T.toLowerCase())}</h3>`;
+  if (T !== 'Pago deuda') h += f('Monto (S/)', `<input id="eMonto" type="text" inputmode="decimal" value="${m.monto}">`);
+  if (T === 'Gasto') h += f('Bolsa', `<select id="eBolsa">${optG(d.bolsas, true)}</select>`);
+  if (T === 'Traslado') h += f('Desde', `<select id="eOrigen">${optG(d.bolsas, true)}</select>`) + f('Hacia', `<select id="eDestino">${optG(d.bolsas, true)}</select>`);
+  h += `<div class="two">${f('Fecha', `<input id="eFecha" type="date" value="${esc(m.fecha)}">`)}${f('Quién', `<select id="eQuien">${quien}</select>`)}</div>`;
+  if (T === 'Gasto' || T === 'Pago deuda') h += f('Método de pago', `<select id="eMetodo">${metodo}</select>`);
+  if (T !== 'Ingreso') h += f('Descripción', `<input id="eDesc" type="text" maxlength="120" value="${esc(m.desc)}">`);
+  if (T === 'Ingreso') h += '<p class="hint" style="margin:12px 0 0">Si cambias el monto, el ingreso se vuelve a repartir en las bolsas.</p>';
+  if (T === 'Pago deuda') h += '<p class="hint" style="margin:12px 0 0">Para cambiar el monto del abono, anúlalo y regístralo de nuevo.</p>';
+  h += '<div class="bt" style="margin-top:16px"><button id="eNo">Cancelar</button><button id="eSi" class="ok" style="background:var(--accent);border-color:var(--accent)">Guardar</button></div>';
+  box.innerHTML = h; box.style.maxHeight = '88vh'; box.style.overflowY = 'auto'; $('modal').classList.remove('hide');
+  if ($('eBolsa')) $('eBolsa').value = m.bo; if ($('eOrigen')) { $('eOrigen').value = m.bo; $('eDestino').value = m.bd; }
+  $('eQuien').value = m.quien || S.user.nombre; if ($('eMetodo')) $('eMetodo').value = m.metodo || '';
+  const cerrar = () => { $('modal').classList.add('hide'); setTimeout(() => { box.innerHTML = orig; box.style.maxHeight = ''; box.style.overflowY = ''; }, 250); };
+  $('eNo').onclick = cerrar;
+  $('eSi').onclick = async () => {
+    const p = { id: m.id, fecha: $('eFecha').value, registrado_por: $('eQuien').value };
+    if ($('eMonto')) { p.monto = num($('eMonto').value); if (!(p.monto > 0)) { toast('Escribe un monto mayor a 0', 'warning'); return; } }
+    if ($('eBolsa')) p.bolsa = $('eBolsa').value;
+    if ($('eOrigen')) { p.origen = $('eOrigen').value; p.destino = $('eDestino').value; }
+    if ($('eMetodo')) p.metodo_pago = $('eMetodo').value;
+    if ($('eDesc')) p.concepto = $('eDesc').value.trim();
+    const b = $('eSi'); b.disabled = true; b.textContent = 'Guardando…';
+    try { const j = await call('editar', p); S.seq++; setData(j.resumen); cerrar(); toast('Movimiento actualizado', 'success'); }
+    catch (er) { b.disabled = false; b.textContent = 'Guardar'; toast(er.message, 'error'); }
+  };
+}
 
 /* ===================== MODAL ===================== */
 function confirmar(t, p, ok) {
